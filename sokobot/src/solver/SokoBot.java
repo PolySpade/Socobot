@@ -5,7 +5,7 @@ public class SokoBot {
   public String solveSokobanPuzzle(int width, int height, char[][] mapData, char[][] itemsData) {
 
 
-
+    /*
     System.out.println("Width"+width+" Height"+height);
 
     System.out.println("Map Data");
@@ -26,7 +26,7 @@ public class SokoBot {
       System.out.println("");
     }
 
-
+    */
     /*
      * YOU NEED TO REWRITE THE IMPLEMENTATION OF THIS METHOD TO MAKE THE BOT SMARTER
      */
