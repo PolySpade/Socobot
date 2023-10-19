@@ -139,33 +139,39 @@ public class SokoBot {
     }
 
     //Overload for Checking Set
-    public boolean contains(State s, Set<State> set){
+    public boolean containset(State s, Set<State> set){
         boolean bool = false;
+        //System.out.println(s.getCrates().size());
         for(State x: set){
-            //Compare Player
-            if(!(s.getPlayer().getX() == x.getPlayer().getX()) && (s.getPlayer().getY() == x.getPlayer().getY())){
-                bool = false;
-            }else{
-                bool = true;
-            }
-            int count = 0;
 
-            if(bool){ //if true, double check the crates
-                for(OrderedPair j : s.getCrates()){ //check crates one by one
-                    for(OrderedPair y : x.getCrates()){
-                        if((j.getX() == y.getX() && j.getY() == y.getY())){
+            //Compare Player
+            if((s.getPlayer().getX() == x.getPlayer().getX()) && (s.getPlayer().getY() == x.getPlayer().getY())){
+                bool = true;
+            }else{
+                bool = false;
+            }
+
+            int count = 0;
+            if(bool) {
+                //Compare Boxes
+                for (OrderedPair j : s.getCrates()) { //check crates one by one
+
+                    for (OrderedPair y : x.getCrates()) {
+                        //System.out.println(s.getCrates().size());
+                        //System.out.println(j.getX() + ":" + j.getY() + "--" + y.getX() + ":" + y.getY());
+                        if ((j.getX() == y.getX() && j.getY() == y.getY())) {
                             count++;
                         }
                     }
+                    //System.out.println();
                 }
-            }
-            if(count == x.getCrates().size()){ //if the number of true is equals
-                bool = true;
-            }else{
-                bool = false;
-            }
-            if(bool){
-                break; //exit the loop
+                if (count == x.getCrates().size()) { //if the number of true is equals
+                    bool = true;
+                    //System.out.println(true);
+                    break;
+                } else {
+                    bool = false;
+                }
             }
         }
         return bool;
@@ -205,14 +211,13 @@ public class SokoBot {
             player_x += action.getRowChange();
             player_y += action.getColChange();
         }
-
         //check if move hits crate or wall
-        return !((contains(new OrderedPair(player_x,player_y),crates) && (contains(new OrderedPair(player_x,player_y),walls))));
+        return !((contains(new OrderedPair(player_x,player_y),crates) || (contains(new OrderedPair(player_x,player_y),walls))));
     }
     public ArrayList<Action> legalAction(OrderedPair player, ArrayList<OrderedPair> crates){
         Action[] allActions = {
-                new Action(1,0,'u'),
-                new Action(-1,0,'d'),
+                new Action(1,0,'d'),
+                new Action(-1,0,'u'),
                 new Action(0,-1,'l'),
                 new Action(0,1,'r')
         };
@@ -240,20 +245,30 @@ public class SokoBot {
 
         //New Player Position
         OrderedPair newPosPlayer = new OrderedPair(action.getRowChange()+player.getX(), action.getColChange()+player.getY());
-
+        //System.out.println(newPosPlayer.getX()+":"+newPosPlayer.getY());
         ArrayList<OrderedPair> tempCrates = new ArrayList<>();
 
         for(OrderedPair i: crates){
             tempCrates.add(new OrderedPair(i.getX(),i.getY()));
         }
 
-
         if(action.getPush()){ //if it is a push action
-            tempCrates.remove(newPosPlayer);
+            //remove ordered pair tuple
+            int count = 0;
+            for(OrderedPair i:tempCrates){
+                if(i.getX() == newPosPlayer.getX() && i.getY() == newPosPlayer.getY()){
+                    break;
+                }else{
+                    count++;
+                }
+            }
+            tempCrates.remove(count);
             tempCrates.add(new OrderedPair(player.getX()+2* action.getRowChange(),player.getY()+2* action.getColChange()));
         }
         //return new Player and Crates Position
-        return new State(newPosPlayer,tempCrates);
+        State newState = new State(newPosPlayer,tempCrates);
+
+        return newState;
     }
 
     public boolean isFailed(ArrayList<OrderedPair> crates){
@@ -285,15 +300,7 @@ public class SokoBot {
                         count++;
                     }
 
-                    /*
-                    for (int i = 0; i < newboard.length; i++) {
-                        System.out.print(newboard[i].getX()+":"+newboard[i].getY() + " ");
-                        if((i+1)%3 == 0){
-                            System.out.println();
-                        }
-                    }
-                    System.out.println();
-                    */
+
 
                     if(
                             //Pruning Patterns
@@ -326,7 +333,7 @@ public class SokoBot {
                             _$#
                             #__
                             _$#
-                             */
+*/
                             //elif newBoard[1] in posBox and newBoard[6] in posBox and newBoard[2] in posWalls and newBoard[3] in posWalls and newBoard[8] in posWalls: return True
                             (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)))
                     {
@@ -336,6 +343,7 @@ public class SokoBot {
 
             }
         }
+
         return false;
     }
 
@@ -362,43 +370,48 @@ public class SokoBot {
         Set<State> exploredSet = new HashSet<>();
         while(!frontier.isEmpty()){
 
-            List<State> node = frontier.poll(); //head , left poll, assigns and deletes
-            List<Action> nodeAction = actions.poll(); //head
+            List<State> node = frontier.poll(); //head , left pop, assigns and deletes
+            List<Action> nodeAction = actions.poll(); //head , left pop,
 
             State currentState = node.get(node.size()-1);
+            //System.out.println(currentState.getPlayer().getX()+":"+currentState.getPlayer().getY());
             if(checkEndState(currentState.getCrates())){ //check if crates align with goals
                 //convert nodes to string
                 StringBuilder s = new StringBuilder();
                 if(nodeAction != null){
                     for(Action a: nodeAction){
-
                         s.append(a.getLetter());
                     }
-                    s.reverse();
                     return s.toString(); //return solution
                 }
-                return ""; //return none
+                return ""; //return none, problem solved
             }
             //check if the current node is explored or not
-            if(!contains(currentState,exploredSet)){
-
+            //!containset(currentState,exploredSet)
+            if(!containset(currentState,exploredSet)){
                 exploredSet.add(currentState);
-                //Check if Action is legal
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
+                    //find deadlocks
                     if(isFailed(newState.getCrates())){ //if crates meet a deadlock
                         continue;
                     }
+
                     List<State> newNode = new ArrayList<>(node); //parent to state node
                     newNode.add(newState);
                     List<Action> newAction = new ArrayList<>(nodeAction);//parent to actions node
                     newAction.add(action);
 
-
+                    //System.out.println(currentState.getPlayer().getX() + ": "+currentState.getPlayer().getY());
                     frontier.add(newNode);
                     actions.add(newAction);
+
+                    //System.out.println(newState.getPlayer().getX()+":"+newState.getPlayer().getY());
+
                 }
+                System.out.println();
             }
+
         }
         return "";
     }
