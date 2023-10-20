@@ -283,40 +283,38 @@ public class SokoBot {
                         count++;
                     }
 
-
-
                     if(
                             //Pruning Patterns
                             /*
                             _#_
-                            __#
+                            _X#
                             ___
                              */
                             (contains(newboard[1],walls) && contains(newboard[5],walls)) ||
                             /*
                             _$#
-                            __#
+                            _X#
                             ___
                              */
                             (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],walls)) ||
                             /*
                             _$#
-                            __$
+                            _X$
                             ___
                              */
-                            (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],crates))||
+                            (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],crates)) ||
                             /*
                             _$$
-                            __$
+                            _X$
                             ___
                              */
                             //elif newBoard[1] in posBox and newBoard[2] in posBox and newBoard[5] in posBox: return True
-                            (contains(newboard[1],crates) && contains(newboard[2],crates) && contains(newboard[3],crates))||
+                            (contains(newboard[1],crates) && contains(newboard[2],crates) && contains(newboard[5],crates)) ||
                             /*
                             _$#
-                            #__
+                            #X_
                             _$#
-*/
+                            */
                             //elif newBoard[1] in posBox and newBoard[6] in posBox and newBoard[2] in posWalls and newBoard[3] in posWalls and newBoard[8] in posWalls: return True
                             (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)))
                     {
@@ -330,71 +328,126 @@ public class SokoBot {
         return false;
     }
 
+    public int heuristic(State s){
+        ArrayList<OrderedPair> crates = s.getCrates();
+
+        int distance = 0;
+
+        // gets the intersection of goals and boxes
+
+        ArrayList<OrderedPair> completes = new ArrayList<>();
+
+        for (int i= 0 ;i < crates.size(); i++)
+            for (int j=0; j < goals.size();j++)
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    completes.add(crates.get(i));
+
+
+        ArrayList<OrderedPair> sortposBox = new ArrayList<>();
+        ArrayList<OrderedPair> sortposGoals = new ArrayList<>();
+
+        // list of crates not in completes
+        for (int i= 0 ;i < crates.size(); i++)
+        {
+            Boolean isInCompletes = false; // assume that the pair is in crate and in completes
+
+            for (int j=0; j < completes.size();j++)
+            {
+                // if found
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    isInCompletes = true;
+            }
+
+            if (!isInCompletes)
+                sortposBox.add(crates.get(i));
+        }
+
+
+        // list of goals not in completes
+        for (int i= 0 ;i < goals.size(); i++)
+        {
+            Boolean isInCompletes = false; // assume that the pair is in goals and in completes
+
+            for (int j=0; j < completes.size();j++)
+            {
+                // if found
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    isInCompletes = true;
+            }
+
+            if (!isInCompletes)
+                sortposGoals.add(goals.get(i));
+        }
+
+        if (sortposBox.size() > 0)
+            for (int i=0;i < sortposBox.size();i++)
+                distance += (Math.abs(sortposBox.get(i).getX()-sortposGoals.get(i).getX()) + Math.abs(sortposBox.get(i).getY() - sortposGoals.get(i).getY()));
+
+        return distance;
+    }
+
     //DFS
     public String SokobanSolver(){
-        /*
-        //Convert it to local
-        OrderedPair player= new OrderedPair(this.player.getX(),this.player.getY());
-
-        ArrayList<OrderedPair> crates = new ArrayList<>();
-
-        for(OrderedPair i: this.crates){
-            crates.add(new OrderedPair(i.getX(),i.getY()));
-        }
-        */
-
         State startState = new State(player,crates);
-        Queue<List<State>> frontier = new LinkedList<>();
-        frontier.add(Arrays.asList(startState));
 
-        Queue<List<Action>> actions = new LinkedList<>();
-        actions.add(Arrays.asList(new Action(0,0,' '))); //start with no moves
+        // Use a priority queue for the frontier
+        PriorityQueue<SearchNode> frontier = new PriorityQueue<>(Comparator.comparingInt(SearchNode::getPriority));
+        frontier.add(new SearchNode(startState, Arrays.asList(new Action(0,0,' ')), heuristic(startState)));
 
         HashSet<String> exploredSet = new HashSet<>();
+
         while(!frontier.isEmpty()){
+            SearchNode currentNode = frontier.poll();
+            State currentState = currentNode.state;
+            List<Action> nodeAction = currentNode.actions;
 
-            List<State> node = frontier.poll(); //head , left pop, assigns and deletes
-            List<Action> nodeAction = actions.poll(); //head , left pop,
-
-            State currentState = node.get(node.size()-1);
             String currentStateString = StatetoString(currentState);
-            //System.out.println(currentState.getPlayer().getX()+":"+currentState.getPlayer().getY());
-            if(checkEndState(currentState.getCrates())){ //check if crates align with goals
-                //convert nodes to string
-                StringBuilder s = new StringBuilder();
-                if(nodeAction != null){
-                    for(Action a: nodeAction){
-                        s.append(a.getLetter());
-                    }
-                    return s.toString(); //return solution
-                }
-                return ""; //return none, problem solved
-            }
-            //check if the current node is explored or not
-            //!containset(currentState,exploredSet)
 
+            if(checkEndState(currentState.getCrates())){
+                StringBuilder s = new StringBuilder();
+                for(Action a: nodeAction){
+                    s.append(a.getLetter());
+                }
+                return s.toString();
+            }
 
             if(!exploredSet.contains(currentStateString)){
                 exploredSet.add(currentStateString);
 
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
-                    //find deadlocks
-                    if(isFailed(newState.getCrates())){ //if crates meet a deadlock
+
+                    if(isFailed(newState.getCrates())){
+                        //System.out.println(currentStateString);
                         continue;
                     }
-                    List<State> newNode = new ArrayList<>(node); //parent to state node
-                    newNode.add(newState);
-                    List<Action> newAction = new ArrayList<>(nodeAction);//parent to actions node
+                    List<Action> newAction = new ArrayList<>(nodeAction);
                     newAction.add(action);
 
-                    frontier.add(newNode);
-                    actions.add(newAction);
+                    int newPriority = newAction.size() + heuristic(newState);
+                    frontier.add(new SearchNode(newState, newAction, newPriority));
                 }
             }
         }
         return "";
     }
+
+    private class SearchNode {
+        State state;
+        List<Action> actions;
+        int priority;
+
+        SearchNode(State state, List<Action> actions, int priority) {
+            this.state = state;
+            this.actions = actions;
+            this.priority = priority;
+        }
+
+        int getPriority() {
+            return priority;
+        }
+    }
+
     public String solveSokobanPuzzle(int width, int height, char[][] mapData, char[][] itemsData) {
 
     /*  1. check possible moves. ( u,d,l,r )
