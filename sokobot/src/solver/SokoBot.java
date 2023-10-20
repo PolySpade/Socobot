@@ -32,14 +32,12 @@ public class SokoBot {
         private int rowChange;
         private int colChange;
         private boolean push;
-        private int heuristic;
         private final char letter;
 
 
         public Action(int rowChange, int colChange, char letter) {
             this.rowChange = rowChange;
             this.colChange = colChange;
-            this.heuristic = 0;
             this.push = false;
             this.letter = letter;
         }
@@ -50,9 +48,6 @@ public class SokoBot {
         public int getColChange() {
             return colChange;
         }
-        public int getHeuristic(){
-            return heuristic;
-        }
 
         public char getLetter() {
             return letter;
@@ -60,9 +55,6 @@ public class SokoBot {
 
         public boolean getPush() {
             return push;
-        }
-        public void setHeuristic(int heuristic){
-            this.heuristic = heuristic;
         }
         public void setPush(boolean push) {
             this.push = push;
@@ -259,12 +251,12 @@ public class SokoBot {
                 {0,1,2,3,4,5,6,7,8}, //0 degrees
                 {2,5,8,1,4,7,0,3,6}, //90 degrees
                 {8,7,6,5,4,3,2,1,0}, //180 degrees
-                {6,3,0,7,4,1,8,5,2}, //270 degrees
+                {6,3,0,7,4,1,8,5,2}, /*//270 degrees
                 //Flip Pattern
                 {2,1,0,5,4,3,8,7,6}, //Horizontal flip
                 {0,3,6,1,4,7,2,5,8}, //Vertical flip
                 {6,7,8,3,4,5,0,1,2}, //Horizontal flip followed by 180-degree rotation
-                {8,5,2,7,4,1,6,3,0} //Vertical flip followed by 180-degree rotation
+                {8,5,2,7,4,1,6,3,0} //Vertical flip followed by 180-degree rotation*/
         };
 
         for(OrderedPair crate: crates){
@@ -328,6 +320,7 @@ public class SokoBot {
         return false;
     }
 
+    /*
     public int heuristic(State s){
         ArrayList<OrderedPair> crates = s.getCrates();
 
@@ -385,14 +378,85 @@ public class SokoBot {
 
         return distance;
     }
+    */
+
+    public int heuristic(State s) { //manhattan distance
+        List<OrderedPair> crates = s.getCrates();
+        int distance = 0;
+
+        // Use a set for faster lookups
+        Set<OrderedPair> matchedGoals = new HashSet<>();
+
+        // Calculate the Manhattan distance between unmatched crates and goals
+        for (OrderedPair crate : crates) {
+            if (goals.contains(crate)) {
+                matchedGoals.add(crate);
+                continue;
+            }
+
+            int minDistance = Integer.MAX_VALUE;
+            OrderedPair closestGoal = null;
+            for (OrderedPair goal : goals) {
+                if (!matchedGoals.contains(goal)) {
+                    int currentDistance = Math.abs(crate.getX() - goal.getX()) + Math.abs(crate.getY() - goal.getY());
+                    if (currentDistance < minDistance) {
+                        minDistance = currentDistance;
+                        closestGoal = goal;
+                    }
+                }
+            }
+            if (closestGoal != null) {
+                matchedGoals.add(closestGoal);
+            }
+            distance += minDistance;
+        }
+
+        return distance;
+    }
+
+    /*
+    public int heuristic(State s) { //manhattan distance
+        List<OrderedPair> crates = s.getCrates();
+        int distance = 0 ;
+        for(OrderedPair c: crates){
+            int min = 1000;
+            for(OrderedPair g: goals){
+                int md = Math.abs(c.getX()-g.getX()) + Math.abs(c.getY()-g.getY());
+                if(md<min){
+                    min = md; //change the new minimum
+                }
+
+            }
+            distance += min; //only return minimum distance
+        }
+
+        return distance;
+    }
+
+     */
+
+    public int open_heuristic(State s){
+        ArrayList<OrderedPair> crates = s.getCrates();
+
+        // gets the intersection of goals and boxes
+
+        ArrayList<OrderedPair> completes = new ArrayList<>();
+
+        for (int i= 0 ;i < crates.size(); i++)
+            for (int j=0; j < goals.size();j++)
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    completes.add(crates.get(i));
+
+        return crates.size()-completes.size();
+    }
 
     //DFS
     public String SokobanSolver(){
         State startState = new State(player,crates);
 
         // Use a priority queue for the frontier
-        PriorityQueue<SearchNode> frontier = new PriorityQueue<>(Comparator.comparingInt(SearchNode::getPriority));
-        frontier.add(new SearchNode(startState, Arrays.asList(new Action(0,0,' ')), heuristic(startState)));
+        PriorityQueue<SearchNode> frontier = new PriorityQueue<>(Comparator.comparingInt(SearchNode::getHeuristic));
+        frontier.add(new SearchNode(startState, Arrays.asList(new Action(0,0,' ')), 0));
 
         HashSet<String> exploredSet = new HashSet<>();
 
@@ -424,8 +488,15 @@ public class SokoBot {
                     List<Action> newAction = new ArrayList<>(nodeAction);
                     newAction.add(action);
 
-                    int newPriority = newAction.size() + heuristic(newState);
-                    frontier.add(new SearchNode(newState, newAction, newPriority));
+                    int newHeuristic;
+                    //only change heuristic if it is true
+                    if(action.getPush()){
+                        newHeuristic = heuristic(newState);
+                    }else{
+                        newHeuristic = currentNode.getHeuristic();
+                    }
+
+                    frontier.add(new SearchNode(newState, newAction, newHeuristic));
                 }
             }
         }
@@ -435,16 +506,16 @@ public class SokoBot {
     private class SearchNode {
         State state;
         List<Action> actions;
-        int priority;
+        int heuristic;
 
-        SearchNode(State state, List<Action> actions, int priority) {
+        SearchNode(State state, List<Action> actions, int heuristic) {
             this.state = state;
             this.actions = actions;
-            this.priority = priority;
+            this.heuristic = heuristic;
         }
 
-        int getPriority() {
-            return priority;
+        int getHeuristic() {
+            return heuristic;
         }
     }
 
