@@ -69,7 +69,6 @@ public class SokoBot {
         }
     }
 
-
     private class State{
         OrderedPair player;
         ArrayList<OrderedPair> crates;
@@ -139,64 +138,35 @@ public class SokoBot {
     }
 
     //Overload for Checking Set
-    public boolean containset(State s, Set<State> set){
-        boolean bool = false;
-        //System.out.println(s.getCrates().size());
-        for(State x: set){
-
-            //Compare Player
-            if((s.getPlayer().getX() == x.getPlayer().getX()) && (s.getPlayer().getY() == x.getPlayer().getY())){
-                bool = true;
-            }else{
-                bool = false;
-            }
-
-            int count = 0;
-            if(bool) {
-                //Compare Boxes
-                for (OrderedPair j : s.getCrates()) { //check crates one by one
-
-                    for (OrderedPair y : x.getCrates()) {
-                        //System.out.println(s.getCrates().size());
-                        //System.out.println(j.getX() + ":" + j.getY() + "--" + y.getX() + ":" + y.getY());
-                        if ((j.getX() == y.getX() && j.getY() == y.getY())) {
-                            count++;
-                        }
-                    }
-                    //System.out.println();
-                }
-                if (count == x.getCrates().size()) { //if the number of true is equals
-                    bool = true;
-                    //System.out.println(true);
-                    break;
-                } else {
-                    bool = false;
-                }
-            }
+    public ArrayList<OrderedPair> sortPairList(ArrayList<OrderedPair> list){
+        ArrayList<OrderedPair> tmp = new ArrayList<>();
+        for(OrderedPair i: list){
+            tmp.add(new OrderedPair(i.getX(),i.getY()));
         }
-        return bool;
+        tmp.sort(new OrderedPairComparator());
+        return tmp;
     }
 
     public Boolean checkEndState(ArrayList<OrderedPair> crates)
     {
-        ArrayList<OrderedPair> sortedCrates = new ArrayList<>();
-        ArrayList<OrderedPair> sortedGoals = new ArrayList<>();
 
-        for(OrderedPair i: crates){
-            sortedCrates.add(new OrderedPair(i.getX(),i.getY()));
+        ArrayList<OrderedPair> sortedCrates = sortPairList(crates);
+        ArrayList<OrderedPair> sortedGoals = sortPairList(goals);
+
+        StringBuilder crates_string = new StringBuilder();
+        StringBuilder goals_string = new StringBuilder();
+        for(OrderedPair p: sortedCrates){
+            crates_string.append(p.getX());
+            crates_string.append(p.getY());
         }
-        for(OrderedPair i: goals){
-            sortedGoals.add(new OrderedPair(i.getX(),i.getY()));
+
+        for(OrderedPair p: sortedGoals){
+            goals_string.append(p.getX());
+            goals_string.append(p.getY());
         }
-        sortedCrates.sort(new OrderedPairComparator());
-        sortedGoals.sort(new OrderedPairComparator());
-        /*
-        for(int i = 0 ; i< sortedCrates.size()-1;i++){
-            System.out.println( sortedCrates.get(i).getX()+":"+sortedCrates.get(i).getY() + " :: " + sortedGoals.get(i).getX()+":"+sortedGoals.get(i).getY());
-        }
-        System.out.println(" ");
-        */
-        return sortedCrates.equals(sortedGoals);
+
+
+        return (goals_string.toString()).equals(crates_string.toString());
     }
     public Boolean isActionLegal(Action action, OrderedPair player,ArrayList<OrderedPair> crates){
         int player_x = player.getX();
@@ -214,6 +184,19 @@ public class SokoBot {
         //check if move hits crate or wall
         return !((contains(new OrderedPair(player_x,player_y),crates) || (contains(new OrderedPair(player_x,player_y),walls))));
     }
+
+    public String StatetoString(State state){
+        StringBuilder s = new StringBuilder();
+        s.append(state.getPlayer().getX());
+        s.append(state.getPlayer().getY());
+        ArrayList<OrderedPair> tmp = sortPairList(state.getCrates());
+        for(OrderedPair p: tmp){
+            s.append(p.getX());
+            s.append(p.getY());
+        }
+        return s.toString();
+    }
+
     public ArrayList<Action> legalAction(OrderedPair player, ArrayList<OrderedPair> crates){
         Action[] allActions = {
                 new Action(1,0,'d'),
@@ -367,13 +350,14 @@ public class SokoBot {
         Queue<List<Action>> actions = new LinkedList<>();
         actions.add(Arrays.asList(new Action(0,0,' '))); //start with no moves
 
-        Set<State> exploredSet = new HashSet<>();
+        HashSet<String> exploredSet = new HashSet<>();
         while(!frontier.isEmpty()){
 
             List<State> node = frontier.poll(); //head , left pop, assigns and deletes
             List<Action> nodeAction = actions.poll(); //head , left pop,
 
             State currentState = node.get(node.size()-1);
+            String currentStateString = StatetoString(currentState);
             //System.out.println(currentState.getPlayer().getX()+":"+currentState.getPlayer().getY());
             if(checkEndState(currentState.getCrates())){ //check if crates align with goals
                 //convert nodes to string
@@ -388,30 +372,26 @@ public class SokoBot {
             }
             //check if the current node is explored or not
             //!containset(currentState,exploredSet)
-            if(!containset(currentState,exploredSet)){
-                exploredSet.add(currentState);
+
+
+            if(!exploredSet.contains(currentStateString)){
+                exploredSet.add(currentStateString);
+
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
                     //find deadlocks
                     if(isFailed(newState.getCrates())){ //if crates meet a deadlock
                         continue;
                     }
-
                     List<State> newNode = new ArrayList<>(node); //parent to state node
                     newNode.add(newState);
                     List<Action> newAction = new ArrayList<>(nodeAction);//parent to actions node
                     newAction.add(action);
 
-                    //System.out.println(currentState.getPlayer().getX() + ": "+currentState.getPlayer().getY());
                     frontier.add(newNode);
                     actions.add(newAction);
-
-                    //System.out.println(newState.getPlayer().getX()+":"+newState.getPlayer().getY());
-
                 }
-                System.out.println();
             }
-
         }
         return "";
     }
