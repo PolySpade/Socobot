@@ -27,6 +27,13 @@ public class SokoBot {
 
     }
 
+    public class ActionListComparator implements Comparator<List<Action>> {
+        @Override
+        public int compare(List<Action> list1, List<Action> list2 ) {
+            return Integer.compare(list1.get(0).getHeuristic(), list2.get(0).getHeuristic());
+        }
+    }
+
     private class Action{
 
         private int rowChange;
@@ -61,6 +68,7 @@ public class SokoBot {
         public boolean getPush() {
             return push;
         }
+
         public void setHeuristic(int heuristic){
             this.heuristic = heuristic;
         }
@@ -69,13 +77,23 @@ public class SokoBot {
         }
     }
 
+    public class ListComparator implements Comparator<List<State>> {
+        @Override
+        public int compare(List<State> list1, List<State> list2 ) {
+            return Integer.compare(list1.get(0).getHeuristic(), list2.get(0).getHeuristic());
+        }
+    }
+
+
     private class State{
         OrderedPair player;
         ArrayList<OrderedPair> crates;
+        int heuristic;
 
         public State(OrderedPair player, ArrayList<OrderedPair> crates){
             this.player = player;
             this.crates = crates;
+            this.heuristic = 0;
         }
 
         public OrderedPair getPlayer() {
@@ -85,7 +103,18 @@ public class SokoBot {
         public ArrayList<OrderedPair> getCrates() {
             return crates;
         }
+
+        public void setHeuristic(int heuristic) {
+            this.heuristic = heuristic;
+        }
+
+        public int getHeuristic() {
+            return heuristic;
+        }
     }
+
+    
+    
     public void convertMapData(char[][] mapData)
     {
         for(int i=0;i< mapData.length;i++)
@@ -254,6 +283,72 @@ public class SokoBot {
         return newState;
     }
 
+    public int heuristic(OrderedPair player, ArrayList<OrderedPair> crates){
+
+        int distance = 0;
+
+        // gets the intersection of goals and boxes
+
+        ArrayList<OrderedPair> completes = new ArrayList<>();
+
+        for (int i= 0 ;i < crates.size(); i++) 
+            for (int j=0; j < goals.size();j++)
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    completes.add(crates.get(i));
+
+
+        ArrayList<OrderedPair> sortposBox = new ArrayList<>();
+        ArrayList<OrderedPair> sortposGoals = new ArrayList<>();
+
+        // list of crates not in completes
+        for (int i= 0 ;i < crates.size(); i++)
+        {
+            Boolean isInCompletes = false; // assume that the pair is in crate and in completes
+
+            for (int j=0; j < completes.size();j++)
+            {
+                // if found
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    isInCompletes = true;
+            }
+
+            if (!isInCompletes)
+                sortposBox.add(crates.get(i));
+        }
+            
+        
+        // list of goals not in completes
+        for (int i= 0 ;i < goals.size(); i++)
+        {
+            Boolean isInCompletes = false; // assume that the pair is in goals and in completes
+
+            for (int j=0; j < completes.size();j++)
+            {
+                // if found
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    isInCompletes = true;
+            }
+
+            if (!isInCompletes)
+                sortposBox.add(goals.get(i));
+        }
+        
+        if (sortposBox.size() > 0)
+            for (int i=0;i < sortposBox.size();i++)
+                distance += (Math.abs(sortposBox.get(i).getX()-sortposGoals.get(i).getX()) + Math.abs(sortposBox.get(i).getY() - sortposGoals.get(i).getY()));
+        
+            return distance;
+    }
+
+    public int cost(List<Action> actions)
+    {
+        int counter = 0;
+        for (Action i: actions)
+            if (i.getPush() == false)
+                counter++;
+        return counter;
+
+    }
     public boolean isFailed(ArrayList<OrderedPair> crates){
         int[][] allPattern = {
                 {0,1,2,3,4,5,6,7,8}, //0 degrees
@@ -344,10 +439,10 @@ public class SokoBot {
         */
 
         State startState = new State(player,crates);
-        Queue<List<State>> frontier = new LinkedList<>();
+        PriorityQueue<List<State>> frontier = new PriorityQueue<List<State>>(new ListComparator());
         frontier.add(Arrays.asList(startState));
 
-        Queue<List<Action>> actions = new LinkedList<>();
+        PriorityQueue<List<Action>> actions = new PriorityQueue<List<Action>>(new ActionListComparator());
         actions.add(Arrays.asList(new Action(0,0,' '))); //start with no moves
 
         HashSet<String> exploredSet = new HashSet<>();
@@ -376,6 +471,7 @@ public class SokoBot {
 
             if(!exploredSet.contains(currentStateString)){
                 exploredSet.add(currentStateString);
+                int cost = cost(nodeAction);
 
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
@@ -383,10 +479,17 @@ public class SokoBot {
                     if(isFailed(newState.getCrates())){ //if crates meet a deadlock
                         continue;
                     }
+
+                    int heuristic = heuristic(currentState.getPlayer(), currentState.getCrates());
+
                     List<State> newNode = new ArrayList<>(node); //parent to state node
+                    newState.setHeuristic(heuristic+cost);
                     newNode.add(newState);
+
                     List<Action> newAction = new ArrayList<>(nodeAction);//parent to actions node
+                    action.setHeuristic(heuristic);
                     newAction.add(action);
+
 
                     frontier.add(newNode);
                     actions.add(newAction);
