@@ -251,8 +251,8 @@ public class SokoBot {
                 {0,1,2,3,4,5,6,7,8}, //0 degrees
                 {2,5,8,1,4,7,0,3,6}, //90 degrees
                 {8,7,6,5,4,3,2,1,0}, //180 degrees
-                {6,3,0,7,4,1,8,5,2}, /*//270 degrees
-                //Flip Pattern
+                {6,3,0,7,4,1,8,5,2}, //270 degrees
+                /*//Flip Pattern
                 {2,1,0,5,4,3,8,7,6}, //Horizontal flip
                 {0,3,6,1,4,7,2,5,8}, //Vertical flip
                 {6,7,8,3,4,5,0,1,2}, //Horizontal flip followed by 180-degree rotation
@@ -320,7 +320,7 @@ public class SokoBot {
         return false;
     }
 
-    /*
+/*
     public int heuristic(State s){
         ArrayList<OrderedPair> crates = s.getCrates();
 
@@ -378,26 +378,29 @@ public class SokoBot {
 
         return distance;
     }
-    */
+*/
 
     public int heuristic(State s) { //manhattan distance
         List<OrderedPair> crates = s.getCrates();
         int distance = 0;
 
         // Use a set for faster lookups
-        Set<OrderedPair> matchedGoals = new HashSet<>();
+        HashSet<String> matchedGoals = new HashSet<>();
 
         // Calculate the Manhattan distance between unmatched crates and goals
         for (OrderedPair crate : crates) {
+            //if crate is in goal already, skip
             if (goals.contains(crate)) {
-                matchedGoals.add(crate);
+                String crateString = crate.getX() +""+ crate.getY();
+                matchedGoals.add(crateString);
                 continue;
             }
-
-            int minDistance = Integer.MAX_VALUE;
+            //check other crates
+            int minDistance = 1000;
             OrderedPair closestGoal = null;
             for (OrderedPair goal : goals) {
-                if (!matchedGoals.contains(goal)) {
+                String goalString = goal.getX() +""+ goal.getY();
+                if (!matchedGoals.contains(goalString)) {
                     int currentDistance = Math.abs(crate.getX() - goal.getX()) + Math.abs(crate.getY() - goal.getY());
                     if (currentDistance < minDistance) {
                         minDistance = currentDistance;
@@ -406,7 +409,8 @@ public class SokoBot {
                 }
             }
             if (closestGoal != null) {
-                matchedGoals.add(closestGoal);
+                String closestString = closestGoal.getX() +""+ closestGoal.getY();
+                matchedGoals.add(closestString);
             }
             distance += minDistance;
         }
@@ -432,13 +436,11 @@ public class SokoBot {
 
         return distance;
     }
-
-     */
-
-    public int open_heuristic(State s){
+*/
+    //OPEN HEURISTICS
+/*
+    public int heuristic(State s){
         ArrayList<OrderedPair> crates = s.getCrates();
-
-        // gets the intersection of goals and boxes
 
         ArrayList<OrderedPair> completes = new ArrayList<>();
 
@@ -450,7 +452,9 @@ public class SokoBot {
         return crates.size()-completes.size();
     }
 
-    //DFS
+ */
+
+    //GBFS
     public String SokobanSolver(){
         State startState = new State(player,crates);
 
@@ -502,6 +506,8 @@ public class SokoBot {
         }
         return "";
     }
+
+
 
     private class SearchNode {
         State state;
