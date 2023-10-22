@@ -1,252 +1,531 @@
-
-import java.util.ArrayList;
-import java.util.PriorityQueue;
-import java.util.Queue;
+package solver;
+import java.util.*;
 
 public class SokoBot {
 
-    ArrayList<OrderedPair> mapDataAL = new ArrayList();
-    ArrayList<OrderedPair> itemsDataAL = new ArrayList();
-
+    //Accomplished OrderedPair (OrderedPair)
     ArrayList<OrderedPair> walls = new ArrayList();
     ArrayList<OrderedPair> goals = new ArrayList();
-
-    OrderedPair player;
     ArrayList<OrderedPair> crates = new ArrayList();
+    OrderedPair player;
+    private class OrderedPair{
+        private int x;
+        private int y;
 
-    
-    // Arraylist itemsData (1-wall, 2-goal, 3-blankspace)
+        public OrderedPair(int x, int y){
+            this.x = x;
+            this.y = y;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+    }
+
+    private class Action{
+
+        private int rowChange;
+        private int colChange;
+        private boolean push;
+        private final char letter;
+
+
+        public Action(int rowChange, int colChange, char letter) {
+            this.rowChange = rowChange;
+            this.colChange = colChange;
+            this.push = false;
+            this.letter = letter;
+        }
+
+        public int getRowChange() {
+            return rowChange;
+        }
+        public int getColChange() {
+            return colChange;
+        }
+
+        public char getLetter() {
+            return letter;
+        }
+
+        public boolean getPush() {
+            return push;
+        }
+        public void setPush(boolean push) {
+            this.push = push;
+        }
+    }
+
+    private class State{
+        OrderedPair player;
+        ArrayList<OrderedPair> crates;
+
+        public State(OrderedPair player, ArrayList<OrderedPair> crates){
+            this.player = player;
+            this.crates = crates;
+        }
+
+        public OrderedPair getPlayer() {
+            return player;
+        }
+
+        public ArrayList<OrderedPair> getCrates() {
+            return crates;
+        }
+    }
     public void convertMapData(char[][] mapData)
     {
         for(int i=0;i< mapData.length;i++)
             for (int j=0;j<mapData[i].length;j++)
             {
-                if (mapData[i][j] == '#') 
+                if (mapData[i][j] == '#')
                 {
-                    mapDataAL.add(new OrderedPair(i, j)); // is a walls
                     walls.add(new OrderedPair(i, j));
                 }
-                else if (mapData[i][j] == '.') 
+                else if (mapData[i][j] == '.')
                 {
-                    mapDataAL.add(new OrderedPair(i, j)); //  is a goal
                     goals.add(new OrderedPair(i, j));
                 }
-                else
-                    mapDataAL.add(new OrderedPair(i, j)); // is a blank space
             }
     }
-
-    // Arraylist itemsData (4-player, 5-crate, 3-blankspace)
     public void convertItemsData(char[][] itemsData)
     {
         for(int i=0;i< itemsData.length;i++)
             for (int j=0;j<itemsData[i].length;j++)
             {
-                if (itemsData[i][j] == '@') 
+                if (itemsData[i][j] == '@')
                 {
-                    mapDataAL.add(new OrderedPair(i, j)); // is a player
                     player = new OrderedPair(i, j);
                 }
-                    
-                else if (itemsData[i][j] == '$') 
+                else if (itemsData[i][j] == '$')
                 {
-                    mapDataAL.add(new OrderedPair(i, j)); //  is a crate
                     crates.add(new OrderedPair(i, j));
                 }
-                else
-                    mapDataAL.add(new OrderedPair(i, j)); // is a blank space
             }
     }
-
-    public int cost(ArrayList<Action> actionsTaken)
-    {
-        int count = 0;
-        for(int i=0;i<actionsTaken.size();i++)
-            if (!actionsTaken.get(i).getIsPush())
-                count++;
-        return count;
+    //Comparator
+    public class OrderedPairComparator implements Comparator<OrderedPair> {
+        @Override
+        public int compare(OrderedPair p1, OrderedPair p2) {
+            if (p1.x != p2.x) {
+                return Integer.compare(p1.x, p2.x); // Sort by x
+            }
+            return Integer.compare(p1.y, p2.y); // If x is the same, sort by y
+        }
     }
 
-    public ArrayList<Action> legalActions(OrderedPair player, ArrayList<OrderedPair> Boxes)
+    public boolean contains(OrderedPair p, ArrayList<OrderedPair> arr){
+        boolean bool = false;
+        for(OrderedPair x: arr){
+            if((p.getX() == x.getX()) && (p.getY() == x.getY())){
+                bool = true;
+            }
+        }
+        return bool;
+    }
+
+    //Overload for Checking Set
+    public ArrayList<OrderedPair> sortPairList(ArrayList<OrderedPair> list){
+        ArrayList<OrderedPair> tmp = new ArrayList<>();
+        for(OrderedPair i: list){
+            tmp.add(new OrderedPair(i.getX(),i.getY()));
+        }
+        tmp.sort(new OrderedPairComparator());
+        return tmp;
+    }
+
+    public Boolean checkEndState(ArrayList<OrderedPair> crates)
     {
-        
-        
-        ArrayList<Action> possibleActions = new ArrayList<>();
-        possibleActions.add(new Action(-1, 0, null, 0)); // up
-        possibleActions.add(new Action(1, 0, null, 0)); // down
-        possibleActions.add(new Action(0, -1, null, 0)); // left
-        possibleActions.add(new Action(0, 1, null, 0)); // right
-        
-        ArrayList<Action> legalActions = new ArrayList<>();
 
-        for (int i=0; i<4; i++)
-        {
-            int x1 = player.getX() + possibleActions.get(i).getColChange(); // possible location of box X
-            int y1 = player.gety() + possibleActions.get(i).getRowChange(); // possible location of box Y
+        ArrayList<OrderedPair> sortedCrates = sortPairList(crates);
+        ArrayList<OrderedPair> sortedGoals = sortPairList(goals);
 
-            Boolean pushing = false;
-            Boolean isWall = false;
-            Boolean isDeadlock = false;
-
-            OrderedPair tempCrate = new OrderedPair(x1, y1); 
-
-            // checks if there's a crate after the move
-            if(crates.contains(tempCrate)) 
-            {
-                pushing = true; 
-                tempCrate.setX(player.getX() + possibleActions.get(i).getColChange() * 2);
-                tempCrate.setX(player.getX() + possibleActions.get(i).getColChange() * 2);
-            }
-            else if (!walls.contains(tempCrate)) // checks if there's a wall after the move
-                legalActions.add(possibleActions.get(i));
-            
-            // this will only be checked if there is pushing***
-            if (pushing)
-            {
-                if(!walls.contains(tempCrate))
-                {
-                    if(!crates.contains(tempCrate))
-                    {
-                        OrderedPair checkNextSpot = new OrderedPair(0, 0);
-                        if ()
-                        // up
-                        // down
-                        // left
-                        // right
-                    
-                        if (!isDeadlock)
-                        {
-                            possibleActions.get(i).setIsPush(true);
-                            legalActions.add(possibleActions.get(i));
-                        }
-                        
-                    }
-                }  
-            }
-            
-                
+        StringBuilder crates_string = new StringBuilder();
+        StringBuilder goals_string = new StringBuilder();
+        for(OrderedPair p: sortedCrates){
+            crates_string.append(p.getX());
+            crates_string.append(p.getY());
         }
 
-        return legalActions;
+        for(OrderedPair p: sortedGoals){
+            goals_string.append(p.getX());
+            goals_string.append(p.getY());
+        }
 
-    } 
 
-    public ArrayList<OrderedPair> updateGameState(OrderedPair player, ArrayList<OrderedPair> Boxes, Action action, OrderedPair newPosPlayer)
-    {
-        ArrayList<OrderedPair> tempBox = Boxes;
+        return (goals_string.toString()).equals(crates_string.toString());
+    }
+    public Boolean isActionLegal(Action action, OrderedPair player,ArrayList<OrderedPair> crates){
+        int player_x = player.getX();
+        int player_y = player.getY();
 
-        int xPrev = player.getX();
-        int yPrev = player.gety();
-
-        if (action.getIsPush())
-        {
-            tempBox.remove(newPosPlayer);
-
-            OrderedPair temp = new OrderedPair(xPrev + action.getColChange()* 2, yPrev + action.getRowChange()* 2, 5)
-            tempBox.add(temp);
-        }   
-
-        return tempBox;       
+        if(action.getPush()){
+            //if it touches a crate
+            //+2 since it advances to double check if it hits another crate or not
+            player_x += 2* action.getRowChange();
+            player_y += 2* action.getColChange();
+        }else{
+            player_x += action.getRowChange();
+            player_y += action.getColChange();
+        }
+        //check if move hits crate or wall
+        return !((contains(new OrderedPair(player_x,player_y),crates) || (contains(new OrderedPair(player_x,player_y),walls))));
     }
 
-    public Boolean checkEndState(ArrayList<OrderedPair> posBox)
-    {
-        int count = 0;
-
-        for(OrderedPair od: goals)
-            for(OrderedPair op: posBox)
-                if (od.getX() == op.getX() && od.gety() == op.gety())
-                    count++;
-
-        if (count == goals.size())
-            return true;
-        else
-            return false;
+    public String StatetoString(State state){
+        StringBuilder s = new StringBuilder();
+        s.append(state.getPlayer().getX());
+        s.append(state.getPlayer().getY());
+        ArrayList<OrderedPair> tmp = sortPairList(state.getCrates());
+        for(OrderedPair p: tmp){
+            s.append(p.getX());
+            s.append(p.getY());
+        }
+        return s.toString();
     }
-    
-    public int theHueristic(OrderedPair player, ArrayList<OrderedPair> posBox)
-    {
-        int distance = 0;
-        ArrayList<OrderedPair> intersection = new ArrayList<>();
-        ArrayList<OrderedPair> boxesNotInGoals = new ArrayList<>();
-        ArrayList<OrderedPair> emptyGoals = new ArrayList<>();
-        
-        
-            if (od.getX() == op.getX() && od.gety() == op.gety())
-            {
-                OrderedPair temp = new OrderedPair(od.getX(), od.gety(), 5);
-                intersection.add(temp);
+
+    public ArrayList<Action> legalAction(OrderedPair player, ArrayList<OrderedPair> crates){
+        Action[] allActions = {
+                new Action(1,0,'d'),
+                new Action(-1,0,'u'),
+                new Action(0,-1,'l'),
+                new Action(0,1,'r')
+        };
+        int player_x = player.getX();
+        int player_y = player.getY();
+
+        ArrayList<Action> possibleActions = new ArrayList<>();
+        for (Action action: allActions){
+            int action_x = player_x + action.getRowChange();
+            int action_y = player_y + action.getColChange();
+
+            if(contains(new OrderedPair(action_x,action_y),crates)){
+                action.setPush(true);
             }
+            //else default is false
+            //check if action is legal or not
+            if(isActionLegal(action,new OrderedPair(player_x,player_y),crates)){
+                possibleActions.add(action);
+            }
+        }
+        return possibleActions;
+    }
 
-        for(OrderedPair op: posBox)
-            for(OrderedPair pair: intersection)
-            {
-                if (op != pair) // this means that the box is not in the goal
-                {
-                    boxesNotInGoals.add(pair);
+    public State updateState(Action action, OrderedPair player, ArrayList<OrderedPair> crates){
+
+        //New Player Position
+        OrderedPair newPosPlayer = new OrderedPair(action.getRowChange()+player.getX(), action.getColChange()+player.getY());
+        //System.out.println(newPosPlayer.getX()+":"+newPosPlayer.getY());
+        ArrayList<OrderedPair> tempCrates = new ArrayList<>();
+
+        for(OrderedPair i: crates){
+            tempCrates.add(new OrderedPair(i.getX(),i.getY()));
+        }
+
+        if(action.getPush()){ //if it is a push action
+            //remove ordered pair tuple
+            int count = 0;
+            for(OrderedPair i:tempCrates){
+                if(i.getX() == newPosPlayer.getX() && i.getY() == newPosPlayer.getY()){
                     break;
+                }else{
+                    count++;
                 }
             }
-        return 0;
+            tempCrates.remove(count);
+            tempCrates.add(new OrderedPair(player.getX()+2* action.getRowChange(),player.getY()+2* action.getColChange()));
+        }
+        //return new Player and Crates Position
+        State newState = new State(newPosPlayer,tempCrates);
+
+        return newState;
+    }
+
+    public boolean isFailed(ArrayList<OrderedPair> crates){
+        int[][] allPattern = {
+                {0,1,2,3,4,5,6,7,8}, //0 degrees
+                {2,5,8,1,4,7,0,3,6}, //90 degrees
+                {8,7,6,5,4,3,2,1,0}, //180 degrees
+                {6,3,0,7,4,1,8,5,2}, //270 degrees
+                /*//Flip Pattern
+                {2,1,0,5,4,3,8,7,6}, //Horizontal flip
+                {0,3,6,1,4,7,2,5,8}, //Vertical flip
+                {6,7,8,3,4,5,0,1,2}, //Horizontal flip followed by 180-degree rotation
+                {8,5,2,7,4,1,6,3,0} //Vertical flip followed by 180-degree rotation*/
+        };
+
+        for(OrderedPair crate: crates){
+            if(!contains(crate,goals)) {
+                OrderedPair[] board = {
+                        new OrderedPair(crate.getX() - 1, crate.getY() - 1), new OrderedPair(crate.getX() - 1, crate.getY()), new OrderedPair(crate.getX() - 1, crate.getY() + 1),
+                        new OrderedPair(crate.getX(), crate.getY() - 1), new OrderedPair(crate.getX(), crate.getY()), new OrderedPair(crate.getX(), crate.getY() + 1),
+                        new OrderedPair(crate.getX() + 1, crate.getY() - 1), new OrderedPair(crate.getX() + 1, crate.getY()), new OrderedPair(crate.getX() + 1, crate.getY() + 1)};
+
+
+                for (int[] pattern : allPattern) {
+                    OrderedPair[] newboard = new OrderedPair[9];
+                    int count = 0;
+                    for (int i : pattern) {
+                        newboard[count] = board[i];
+                        count++;
+                    }
+
+                    if(
+                            //Pruning Patterns
+                            /*
+                            _#_
+                            _X#
+                            ___
+                             */
+                            (contains(newboard[1],walls) && contains(newboard[5],walls)) ||
+                            /*
+                            _$#
+                            _X#
+                            ___
+                             */
+                            (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],walls)) ||
+                            /*
+                            _$#
+                            _X$
+                            ___
+                             */
+                            (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],crates)) ||
+                            /*
+                            _$$
+                            _X$
+                            ___
+                             */
+                            //elif newBoard[1] in posBox and newBoard[2] in posBox and newBoard[5] in posBox: return True
+                            (contains(newboard[1],crates) && contains(newboard[2],crates) && contains(newboard[5],crates)) ||
+                            /*
+                            _$#
+                            #X_
+                            _$#
+                            */
+                            //elif newBoard[1] in posBox and newBoard[6] in posBox and newBoard[2] in posWalls and newBoard[3] in posWalls and newBoard[8] in posWalls: return True
+                            (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)))
+                    {
+                        return true;
+                    }
+                }
+
+            }
+        }
+
+        return false;
+    }
+
+/*
+    public int heuristic(State s){
+        ArrayList<OrderedPair> crates = s.getCrates();
+
+        int distance = 0;
+
+        // gets the intersection of goals and boxes
+
+        ArrayList<OrderedPair> completes = new ArrayList<>();
+
+        for (int i= 0 ;i < crates.size(); i++)
+            for (int j=0; j < goals.size();j++)
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    completes.add(crates.get(i));
+
+
+        ArrayList<OrderedPair> sortposBox = new ArrayList<>();
+        ArrayList<OrderedPair> sortposGoals = new ArrayList<>();
+
+        // list of crates not in completes
+        for (int i= 0 ;i < crates.size(); i++)
+        {
+            Boolean isInCompletes = false; // assume that the pair is in crate and in completes
+
+            for (int j=0; j < completes.size();j++)
+            {
+                // if found
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    isInCompletes = true;
+            }
+
+            if (!isInCompletes)
+                sortposBox.add(crates.get(i));
+        }
+
+
+        // list of goals not in completes
+        for (int i= 0 ;i < goals.size(); i++)
+        {
+            Boolean isInCompletes = false; // assume that the pair is in goals and in completes
+
+            for (int j=0; j < completes.size();j++)
+            {
+                // if found
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    isInCompletes = true;
+            }
+
+            if (!isInCompletes)
+                sortposGoals.add(goals.get(i));
+        }
+
+        if (sortposBox.size() > 0)
+            for (int i=0;i < sortposBox.size();i++)
+                distance += (Math.abs(sortposBox.get(i).getX()-sortposGoals.get(i).getX()) + Math.abs(sortposBox.get(i).getY() - sortposGoals.get(i).getY()));
+
+        return distance;
+    }
+*/
+
+    public int heuristic(State s) { //manhattan distance
+        List<OrderedPair> crates = s.getCrates();
+        int distance = 0;
+
+        // Use a set for faster lookups
+        HashSet<String> matchedGoals = new HashSet<>();
+
+        // Calculate the Manhattan distance between unmatched crates and goals
+        for (OrderedPair crate : crates) {
+            //if crate is in goal already, skip
+            if (goals.contains(crate)) {
+                String crateString = crate.getX() +""+ crate.getY();
+                matchedGoals.add(crateString);
+                continue;
+            }
+            //check other crates
+            int minDistance = 1000;
+            OrderedPair closestGoal = null;
+            for (OrderedPair goal : goals) {
+                String goalString = goal.getX() +""+ goal.getY();
+                if (!matchedGoals.contains(goalString)) {
+                    int currentDistance = Math.abs(crate.getX() - goal.getX()) + Math.abs(crate.getY() - goal.getY());
+                    if (currentDistance < minDistance) {
+                        minDistance = currentDistance;
+                        closestGoal = goal;
+                    }
+                }
+            }
+            if (closestGoal != null) {
+                String closestString = closestGoal.getX() +""+ closestGoal.getY();
+                matchedGoals.add(closestString);
+            }
+            distance += minDistance;
+        }
+
+        return distance;
+    }
+
+    /*
+    public int heuristic(State s) { //manhattan distance
+        List<OrderedPair> crates = s.getCrates();
+        int distance = 0 ;
+        for(OrderedPair c: crates){
+            int min = 1000;
+            for(OrderedPair g: goals){
+                int md = Math.abs(c.getX()-g.getX()) + Math.abs(c.getY()-g.getY());
+                if(md<min){
+                    min = md; //change the new minimum
+                }
+
+            }
+            distance += min; //only return minimum distance
+        }
+
+        return distance;
+    }
+*/
+    //OPEN HEURISTICS
+/*
+    public int heuristic(State s){
+        ArrayList<OrderedPair> crates = s.getCrates();
+
+        ArrayList<OrderedPair> completes = new ArrayList<>();
+
+        for (int i= 0 ;i < crates.size(); i++)
+            for (int j=0; j < goals.size();j++)
+                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
+                    completes.add(crates.get(i));
+
+        return crates.size()-completes.size();
+    }
+
+ */
+
+    //GBFS
+    public String SokobanSolver(){
+        State startState = new State(player,crates);
+
+        // Use a priority queue for the frontier
+        PriorityQueue<SearchNode> frontier = new PriorityQueue<>(Comparator.comparingInt(SearchNode::getHeuristic));
+        frontier.add(new SearchNode(startState, Arrays.asList(new Action(0,0,' ')), 0));
+
+        HashSet<String> exploredSet = new HashSet<>();
+
+        while(!frontier.isEmpty()){
+            SearchNode currentNode = frontier.poll();
+            State currentState = currentNode.state;
+            List<Action> nodeAction = currentNode.actions;
+
+            String currentStateString = StatetoString(currentState);
+
+            if(checkEndState(currentState.getCrates())){
+                StringBuilder s = new StringBuilder();
+                for(Action a: nodeAction){
+                    s.append(a.getLetter());
+                }
+                return s.toString();
+            }
+
+            if(!exploredSet.contains(currentStateString)){
+                exploredSet.add(currentStateString);
+
+                for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
+                    State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
+
+                    if(isFailed(newState.getCrates())){
+                        //System.out.println(currentStateString);
+                        continue;
+                    }
+                    List<Action> newAction = new ArrayList<>(nodeAction);
+                    newAction.add(action);
+
+                    int newHeuristic;
+                    //only change heuristic if it is true
+                    if(action.getPush()){
+                        newHeuristic = heuristic(newState);
+                    }else{
+                        newHeuristic = currentNode.getHeuristic();
+                    }
+
+                    frontier.add(new SearchNode(newState, newAction, newHeuristic));
+                }
+            }
+        }
+        return "";
+    }
+
+
+
+    private class SearchNode {
+        State state;
+        List<Action> actions;
+        int heuristic;
+
+        SearchNode(State state, List<Action> actions, int heuristic) {
+            this.state = state;
+            this.actions = actions;
+            this.heuristic = heuristic;
+        }
+
+        int getHeuristic() {
+            return heuristic;
+        }
     }
 
     public String solveSokobanPuzzle(int width, int height, char[][] mapData, char[][] itemsData) {
-    
-    convertMapData(mapData); // converts the walls and the targets to int, map them to ordered pair
-    convertItemsData(itemsData);  // converts the player and the crates to int, map them to ordered pair
-
-    PriorityQueue<State> frontier = new PriorityQueue<>();
-
-    State startState = new State(player,crates,0);
-
-    // States look like [(0,1), (0,2)]
-    frontier.add(startState);
-
-    PriorityQueue<Action> actions = new PriorityQueue<>();
-    // action looks like (-1,0,false,18)
-
-    actions.add(new Action(0,0,false,0)); // no movement, no hueristic
-
-    ArrayList<State> exploredSet = new ArrayList();
-    ArrayList<Action> node_actions = new ArrayList<>();
-
-    while(!frontier.isEmpty())
-    {
-        State node = frontier.poll();
-        Action action = actions.poll();
-
-        node_actions.add(action);
-
-        if (checkEndState(node.getPosBox()))
-
-        if (!exploredSet.contains(node))
-        {
-            exploredSet.add(node);
-            int cost = cost(node_actions);
-
-            ArrayList<Action> legalActions = legalActions(player, crates);
-
-            for(Action i: legalActions)
-            {
-                int xPrev = player.getX();
-                int yPrev = player.gety();
-
-                OrderedPair newPosPlayer = new OrderedPair(xPrev + action.getColChange(), yPrev + action.getRowChange()); 
-                ArrayList<OrderedPair> newPosBox = updateGameState(player,crates, i, newPosPlayer);
-                
-                State newTemp = new State (newPosPlayer,newPosBox, 0);
-                frontier.add(node);
-
-            }
-            
-        }
-
-    }
-
-
-     
-     
-
 
     /*  1. check possible moves. ( u,d,l,r )
      * 
@@ -255,11 +534,6 @@ public class SokoBot {
      * 1. remap each 
      *
      */
-    
-
-
-
-
 
     /*
      * mapData Contains
@@ -271,16 +545,15 @@ public class SokoBot {
      * - the crates
      */
 
-  
 
-
-
-    try {
-      Thread.sleep(3000);
-    } catch (Exception ex) {
-      ex.printStackTrace();
-    }
-    return "lrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlr";
+    //Convert Map
+    convertItemsData(itemsData);
+    convertMapData(mapData);
+    return SokobanSolver();
   }
+
+
+
+
 
 }
