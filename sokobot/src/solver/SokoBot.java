@@ -220,7 +220,6 @@ public class SokoBot {
 
         //New Player Position
         OrderedPair newPosPlayer = new OrderedPair(action.getRowChange()+player.getX(), action.getColChange()+player.getY());
-        //System.out.println(newPosPlayer.getX()+":"+newPosPlayer.getY());
         ArrayList<OrderedPair> tempCrates = new ArrayList<>();
 
         for(OrderedPair i: crates){
@@ -246,17 +245,12 @@ public class SokoBot {
         return newState;
     }
 
-    public boolean isFailed(ArrayList<OrderedPair> crates){
+    public boolean isDeadlock(ArrayList<OrderedPair> crates){
         int[][] allPattern = {
                 {0,1,2,3,4,5,6,7,8}, //0 degrees
                 {2,5,8,1,4,7,0,3,6}, //90 degrees
                 {8,7,6,5,4,3,2,1,0}, //180 degrees
                 {6,3,0,7,4,1,8,5,2}, //270 degrees
-                /*//Flip Pattern
-                {2,1,0,5,4,3,8,7,6}, //Horizontal flip
-                {0,3,6,1,4,7,2,5,8}, //Vertical flip
-                {6,7,8,3,4,5,0,1,2}, //Horizontal flip followed by 180-degree rotation
-                {8,5,2,7,4,1,6,3,0} //Vertical flip followed by 180-degree rotation*/
         };
 
         for(OrderedPair crate: crates){
@@ -265,7 +259,6 @@ public class SokoBot {
                         new OrderedPair(crate.getX() - 1, crate.getY() - 1), new OrderedPair(crate.getX() - 1, crate.getY()), new OrderedPair(crate.getX() - 1, crate.getY() + 1),
                         new OrderedPair(crate.getX(), crate.getY() - 1), new OrderedPair(crate.getX(), crate.getY()), new OrderedPair(crate.getX(), crate.getY() + 1),
                         new OrderedPair(crate.getX() + 1, crate.getY() - 1), new OrderedPair(crate.getX() + 1, crate.getY()), new OrderedPair(crate.getX() + 1, crate.getY() + 1)};
-
 
                 for (int[] pattern : allPattern) {
                     OrderedPair[] newboard = new OrderedPair[9];
@@ -300,15 +293,19 @@ public class SokoBot {
                             _X$
                             ___
                              */
-                            //elif newBoard[1] in posBox and newBoard[2] in posBox and newBoard[5] in posBox: return True
                             (contains(newboard[1],crates) && contains(newboard[2],crates) && contains(newboard[5],crates)) ||
                             /*
                             _$#
                             #X_
                             _$#
                             */
-                            //elif newBoard[1] in posBox and newBoard[6] in posBox and newBoard[2] in posWalls and newBoard[3] in posWalls and newBoard[8] in posWalls: return True
-                            (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)))
+                            (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)) ||
+                            /*
+                            _#_
+                            $X_
+                            #__
+                            */
+                            (contains(newboard[1],walls) && contains(newboard[6],walls) && contains(newboard[3],crates)))
                     {
                         return true;
                     }
@@ -319,67 +316,6 @@ public class SokoBot {
 
         return false;
     }
-
-/*
-    public int heuristic(State s){
-        ArrayList<OrderedPair> crates = s.getCrates();
-
-        int distance = 0;
-
-        // gets the intersection of goals and boxes
-
-        ArrayList<OrderedPair> completes = new ArrayList<>();
-
-        for (int i= 0 ;i < crates.size(); i++)
-            for (int j=0; j < goals.size();j++)
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    completes.add(crates.get(i));
-
-
-        ArrayList<OrderedPair> sortposBox = new ArrayList<>();
-        ArrayList<OrderedPair> sortposGoals = new ArrayList<>();
-
-        // list of crates not in completes
-        for (int i= 0 ;i < crates.size(); i++)
-        {
-            Boolean isInCompletes = false; // assume that the pair is in crate and in completes
-
-            for (int j=0; j < completes.size();j++)
-            {
-                // if found
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    isInCompletes = true;
-            }
-
-            if (!isInCompletes)
-                sortposBox.add(crates.get(i));
-        }
-
-
-        // list of goals not in completes
-        for (int i= 0 ;i < goals.size(); i++)
-        {
-            Boolean isInCompletes = false; // assume that the pair is in goals and in completes
-
-            for (int j=0; j < completes.size();j++)
-            {
-                // if found
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    isInCompletes = true;
-            }
-
-            if (!isInCompletes)
-                sortposGoals.add(goals.get(i));
-        }
-
-        if (sortposBox.size() > 0)
-            for (int i=0;i < sortposBox.size();i++)
-                distance += (Math.abs(sortposBox.get(i).getX()-sortposGoals.get(i).getX()) + Math.abs(sortposBox.get(i).getY() - sortposGoals.get(i).getY()));
-
-        return distance;
-    }
-*/
-
     public int heuristic(State s) { //manhattan distance
         List<OrderedPair> crates = s.getCrates();
         int distance = 0;
@@ -417,43 +353,6 @@ public class SokoBot {
 
         return distance;
     }
-
-    /*
-    public int heuristic(State s) { //manhattan distance
-        List<OrderedPair> crates = s.getCrates();
-        int distance = 0 ;
-        for(OrderedPair c: crates){
-            int min = 1000;
-            for(OrderedPair g: goals){
-                int md = Math.abs(c.getX()-g.getX()) + Math.abs(c.getY()-g.getY());
-                if(md<min){
-                    min = md; //change the new minimum
-                }
-
-            }
-            distance += min; //only return minimum distance
-        }
-
-        return distance;
-    }
-*/
-    //OPEN HEURISTICS
-/*
-    public int heuristic(State s){
-        ArrayList<OrderedPair> crates = s.getCrates();
-
-        ArrayList<OrderedPair> completes = new ArrayList<>();
-
-        for (int i= 0 ;i < crates.size(); i++)
-            for (int j=0; j < goals.size();j++)
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    completes.add(crates.get(i));
-
-        return crates.size()-completes.size();
-    }
-
- */
-
     //GBFS
     public String SokobanSolver(){
         State startState = new State(player,crates);
@@ -485,8 +384,7 @@ public class SokoBot {
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
 
-                    if(isFailed(newState.getCrates())){
-                        //System.out.println(currentStateString);
+                    if(isDeadlock(newState.getCrates())){
                         continue;
                     }
                     List<Action> newAction = new ArrayList<>(nodeAction);
