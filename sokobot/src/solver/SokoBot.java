@@ -32,14 +32,12 @@ public class SokoBot {
         private int rowChange;
         private int colChange;
         private boolean push;
-        private int heuristic;
         private final char letter;
 
 
         public Action(int rowChange, int colChange, char letter) {
             this.rowChange = rowChange;
             this.colChange = colChange;
-            this.heuristic = 0;
             this.push = false;
             this.letter = letter;
         }
@@ -50,9 +48,6 @@ public class SokoBot {
         public int getColChange() {
             return colChange;
         }
-        public int getHeuristic(){
-            return heuristic;
-        }
 
         public char getLetter() {
             return letter;
@@ -60,9 +55,6 @@ public class SokoBot {
 
         public boolean getPush() {
             return push;
-        }
-        public void setHeuristic(int heuristic){
-            this.heuristic = heuristic;
         }
         public void setPush(boolean push) {
             this.push = push;
@@ -165,7 +157,6 @@ public class SokoBot {
             goals_string.append(p.getY());
         }
 
-
         return (goals_string.toString()).equals(crates_string.toString());
     }
     public Boolean isActionLegal(Action action, OrderedPair player,ArrayList<OrderedPair> crates){
@@ -228,7 +219,6 @@ public class SokoBot {
 
         //New Player Position
         OrderedPair newPosPlayer = new OrderedPair(action.getRowChange()+player.getX(), action.getColChange()+player.getY());
-        //System.out.println(newPosPlayer.getX()+":"+newPosPlayer.getY());
         ArrayList<OrderedPair> tempCrates = new ArrayList<>();
 
         for(OrderedPair i: crates){
@@ -254,17 +244,12 @@ public class SokoBot {
         return newState;
     }
 
-    public boolean isFailed(ArrayList<OrderedPair> crates){
+    public boolean isDeadlock(ArrayList<OrderedPair> crates){
         int[][] allPattern = {
                 {0,1,2,3,4,5,6,7,8}, //0 degrees
                 {2,5,8,1,4,7,0,3,6}, //90 degrees
                 {8,7,6,5,4,3,2,1,0}, //180 degrees
                 {6,3,0,7,4,1,8,5,2}, //270 degrees
-                //Flip Pattern
-                {2,1,0,5,4,3,8,7,6}, //Horizontal flip
-                {0,3,6,1,4,7,2,5,8}, //Vertical flip
-                {6,7,8,3,4,5,0,1,2}, //Horizontal flip followed by 180-degree rotation
-                {8,5,2,7,4,1,6,3,0} //Vertical flip followed by 180-degree rotation
         };
 
         for(OrderedPair crate: crates){
@@ -274,7 +259,6 @@ public class SokoBot {
                         new OrderedPair(crate.getX(), crate.getY() - 1), new OrderedPair(crate.getX(), crate.getY()), new OrderedPair(crate.getX(), crate.getY() + 1),
                         new OrderedPair(crate.getX() + 1, crate.getY() - 1), new OrderedPair(crate.getX() + 1, crate.getY()), new OrderedPair(crate.getX() + 1, crate.getY() + 1)};
 
-
                 for (int[] pattern : allPattern) {
                     OrderedPair[] newboard = new OrderedPair[9];
                     int count = 0;
@@ -283,42 +267,50 @@ public class SokoBot {
                         count++;
                     }
 
-
-
                     if(
-                            //Pruning Patterns
+                        //Pruning Patterns
                             /*
                             _#_
-                            __#
+                            _X#
                             ___
                              */
                             (contains(newboard[1],walls) && contains(newboard[5],walls)) ||
                             /*
                             _$#
-                            __#
+                            _X#
                             ___
                              */
-                            (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],walls)) ||
+                                    (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],walls)) ||
+                            /*
+                            _#$
+                            _X$
+                            ___
+                             */
+                                    (contains(newboard[1],walls) && contains(newboard[2],crates) && contains(newboard[5],crates)) ||
                             /*
                             _$#
-                            __$
+                            _X$
                             ___
                              */
-                            (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],crates))||
+                                    (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],crates)) ||
                             /*
                             _$$
-                            __$
+                            _X$
                             ___
                              */
-                            //elif newBoard[1] in posBox and newBoard[2] in posBox and newBoard[5] in posBox: return True
-                            (contains(newboard[1],crates) && contains(newboard[2],crates) && contains(newboard[3],crates))||
+                                    (contains(newboard[1],crates) && contains(newboard[2],crates) && contains(newboard[5],crates)) ||
                             /*
                             _$#
-                            #__
+                            #X_
                             _$#
-*/
-                            //elif newBoard[1] in posBox and newBoard[6] in posBox and newBoard[2] in posWalls and newBoard[3] in posWalls and newBoard[8] in posWalls: return True
-                            (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)))
+                            */
+                                    (contains(newboard[1],crates) && contains(newboard[7],crates) && contains(newboard[2],walls) && contains(newboard[3],walls)&& contains(newboard[8],walls)) ||
+                            /*
+                            _#_
+                            $X_
+                            #__
+                            */
+                                    (contains(newboard[1],walls) && contains(newboard[6],walls) && contains(newboard[3],crates)))
                     {
                         return true;
                     }
@@ -329,101 +321,138 @@ public class SokoBot {
 
         return false;
     }
+    public int heuristic(State s) { //manhattan distance
+        List<OrderedPair> crates = s.getCrates();
+        int distance = 0;
 
-    //DFS
-    public String SokobanSolver(){
-        /*
-        //Convert it to local
-        OrderedPair player= new OrderedPair(this.player.getX(),this.player.getY());
+        // Use a set for faster lookups
+        HashSet<String> matchedGoals = new HashSet<>();
 
-        ArrayList<OrderedPair> crates = new ArrayList<>();
-
-        for(OrderedPair i: this.crates){
-            crates.add(new OrderedPair(i.getX(),i.getY()));
+        // Calculate the Manhattan distance between unmatched crates and goals
+        for (OrderedPair crate : crates) {
+            //if crate is in goal already, skip
+            if (goals.contains(crate)) {
+                String crateString = crate.getX() +""+ crate.getY();
+                matchedGoals.add(crateString);
+                continue;
+            }
+            //check other crates
+            int minDistance = 1000;
+            OrderedPair closestGoal = null;
+            for (OrderedPair goal : goals) {
+                String goalString = goal.getX() +""+ goal.getY();
+                if (!matchedGoals.contains(goalString)) {
+                    int currentDistance = Math.abs(crate.getX() - goal.getX()) + Math.abs(crate.getY() - goal.getY());
+                    if (currentDistance < minDistance) {
+                        minDistance = currentDistance;
+                        closestGoal = goal;
+                    }
+                }
+            }
+            if (closestGoal != null) {
+                String closestString = closestGoal.getX() +""+ closestGoal.getY();
+                matchedGoals.add(closestString);
+            }
+            distance += minDistance;
         }
-        */
 
+        return distance;
+    }
+    //GBFS
+    public String SokobanSolver(){
         State startState = new State(player,crates);
-        Queue<List<State>> frontier = new LinkedList<>();
-        frontier.add(Arrays.asList(startState));
 
-        Queue<List<Action>> actions = new LinkedList<>();
-        actions.add(Arrays.asList(new Action(0,0,' '))); //start with no moves
+        // Use a priority queue for the frontier
+        PriorityQueue<SearchNode> frontier = new PriorityQueue<>(Comparator.comparingInt(SearchNode::getHeuristic));
+        frontier.add(new SearchNode(startState, Arrays.asList(new Action(0,0,' ')), 0));
 
         HashSet<String> exploredSet = new HashSet<>();
+
         while(!frontier.isEmpty()){
+            SearchNode currentNode = frontier.poll();
+            State currentState = currentNode.state;
+            List<Action> nodeAction = currentNode.actions;
 
-            List<State> node = frontier.poll(); //head , left pop, assigns and deletes
-            List<Action> nodeAction = actions.poll(); //head , left pop,
-
-            State currentState = node.get(node.size()-1);
             String currentStateString = StatetoString(currentState);
-            //System.out.println(currentState.getPlayer().getX()+":"+currentState.getPlayer().getY());
-            if(checkEndState(currentState.getCrates())){ //check if crates align with goals
-                //convert nodes to string
-                StringBuilder s = new StringBuilder();
-                if(nodeAction != null){
-                    for(Action a: nodeAction){
-                        s.append(a.getLetter());
-                    }
-                    return s.toString(); //return solution
-                }
-                return ""; //return none, problem solved
-            }
-            //check if the current node is explored or not
-            //!containset(currentState,exploredSet)
 
+            if(checkEndState(currentState.getCrates())){
+                StringBuilder s = new StringBuilder();
+                for(Action a: nodeAction){
+                    s.append(a.getLetter());
+                }
+                return s.toString();
+            }
 
             if(!exploredSet.contains(currentStateString)){
                 exploredSet.add(currentStateString);
 
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
-                    //find deadlocks
-                    if(isFailed(newState.getCrates())){ //if crates meet a deadlock
+
+                    if(isDeadlock(newState.getCrates())){
                         continue;
                     }
-                    List<State> newNode = new ArrayList<>(node); //parent to state node
-                    newNode.add(newState);
-                    List<Action> newAction = new ArrayList<>(nodeAction);//parent to actions node
+                    List<Action> newAction = new ArrayList<>(nodeAction);
                     newAction.add(action);
 
-                    frontier.add(newNode);
-                    actions.add(newAction);
+                    int newHeuristic;
+                    //only change heuristic if it is true
+                    if(action.getPush()){
+                        newHeuristic = heuristic(newState);
+                    }else{
+                        newHeuristic = currentNode.getHeuristic();
+                    }
+
+                    frontier.add(new SearchNode(newState, newAction, newHeuristic));
                 }
             }
         }
         return "";
     }
+
+
+
+    private class SearchNode {
+        State state;
+        List<Action> actions;
+        int heuristic;
+
+        SearchNode(State state, List<Action> actions, int heuristic) {
+            this.state = state;
+            this.actions = actions;
+            this.heuristic = heuristic;
+        }
+
+        int getHeuristic() {
+            return heuristic;
+        }
+    }
+
     public String solveSokobanPuzzle(int width, int height, char[][] mapData, char[][] itemsData) {
 
-    /*  1. check possible moves. ( u,d,l,r )
-     * 
-     * EACH NODE HAS TO GO THROUGH THIS TO CHECK WHICH IS POSSIBLE TO ADD
-     * 
-     * 1. remap each 
-     *
-     */
+        /*  1. check possible moves. ( u,d,l,r )
+         *
+         * EACH NODE HAS TO GO THROUGH THIS TO CHECK WHICH IS POSSIBLE TO ADD
+         *
+         * 1. remap each
+         *
+         */
 
-    /*
-     * mapData Contains
-     * - wall
-     * - target
-     * 
-     * itemsData contains
-     * - the player
-     * - the crates
-     */
-
-
-    //Convert Map
-    convertItemsData(itemsData);
-    convertMapData(mapData);
-    return SokobanSolver();
-  }
+        /*
+         * mapData Contains
+         * - wall
+         * - target
+         *
+         * itemsData contains
+         * - the player
+         * - the crates
+         */
 
 
-
-
+        //Convert Map
+        convertItemsData(itemsData);
+        convertMapData(mapData);
+        return SokobanSolver();
+    }
 
 }
