@@ -283,6 +283,12 @@ public class SokoBot {
                              */
                             (contains(newboard[1],crates) && contains(newboard[2],walls) && contains(newboard[5],walls)) ||
                             /*
+                            _#$
+                            _X$
+                            ___
+                             */
+                            (contains(newboard[1],walls) && contains(newboard[2],crates) && contains(newboard[5],crates)) ||
+                            /*
                             _$#
                             _X$
                             ___
