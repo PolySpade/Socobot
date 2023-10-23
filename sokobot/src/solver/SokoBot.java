@@ -157,7 +157,6 @@ public class SokoBot {
             goals_string.append(p.getY());
         }
 
-
         return (goals_string.toString()).equals(crates_string.toString());
     }
     public Boolean isActionLegal(Action action, OrderedPair player,ArrayList<OrderedPair> crates){
