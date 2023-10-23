@@ -220,7 +220,7 @@ public class SokoBot {
 
         //New Player Position
         OrderedPair newPosPlayer = new OrderedPair(action.getRowChange()+player.getX(), action.getColChange()+player.getY());
-        //System.out.println(newPosPlayer.getX()+":"+newPosPlayer.getY());
+
         ArrayList<OrderedPair> tempCrates = new ArrayList<>();
 
         for(OrderedPair i: crates){
@@ -319,212 +319,72 @@ public class SokoBot {
 
         return false;
     }
-
-/*
-    public int heuristic(State s){
-        ArrayList<OrderedPair> crates = s.getCrates();
-
-        int distance = 0;
-
-        // gets the intersection of goals and boxes
-
-        ArrayList<OrderedPair> completes = new ArrayList<>();
-
-        for (int i= 0 ;i < crates.size(); i++)
-            for (int j=0; j < goals.size();j++)
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    completes.add(crates.get(i));
-
-
-        ArrayList<OrderedPair> sortposBox = new ArrayList<>();
-        ArrayList<OrderedPair> sortposGoals = new ArrayList<>();
-
-        // list of crates not in completes
-        for (int i= 0 ;i < crates.size(); i++)
-        {
-            Boolean isInCompletes = false; // assume that the pair is in crate and in completes
-
-            for (int j=0; j < completes.size();j++)
-            {
-                // if found
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    isInCompletes = true;
-            }
-
-            if (!isInCompletes)
-                sortposBox.add(crates.get(i));
-        }
-
-
-        // list of goals not in completes
-        for (int i= 0 ;i < goals.size(); i++)
-        {
-            Boolean isInCompletes = false; // assume that the pair is in goals and in completes
-
-            for (int j=0; j < completes.size();j++)
-            {
-                // if found
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    isInCompletes = true;
-            }
-
-            if (!isInCompletes)
-                sortposGoals.add(goals.get(i));
-        }
-
-        if (sortposBox.size() > 0)
-            for (int i=0;i < sortposBox.size();i++)
-                distance += (Math.abs(sortposBox.get(i).getX()-sortposGoals.get(i).getX()) + Math.abs(sortposBox.get(i).getY() - sortposGoals.get(i).getY()));
-
-        return distance;
-    }
-*/
-
-    public int heuristic(State s) { //manhattan distance
-        List<OrderedPair> crates = s.getCrates();
-        int distance = 0;
-
-        // Use a set for faster lookups
-        HashSet<String> matchedGoals = new HashSet<>();
-
-        // Calculate the Manhattan distance between unmatched crates and goals
-        for (OrderedPair crate : crates) {
-            //if crate is in goal already, skip
-            if (goals.contains(crate)) {
-                String crateString = crate.getX() +""+ crate.getY();
-                matchedGoals.add(crateString);
-                continue;
-            }
-            //check other crates
-            int minDistance = 1000;
-            OrderedPair closestGoal = null;
-            for (OrderedPair goal : goals) {
-                String goalString = goal.getX() +""+ goal.getY();
-                if (!matchedGoals.contains(goalString)) {
-                    int currentDistance = Math.abs(crate.getX() - goal.getX()) + Math.abs(crate.getY() - goal.getY());
-                    if (currentDistance < minDistance) {
-                        minDistance = currentDistance;
-                        closestGoal = goal;
-                    }
-                }
-            }
-            if (closestGoal != null) {
-                String closestString = closestGoal.getX() +""+ closestGoal.getY();
-                matchedGoals.add(closestString);
-            }
-            distance += minDistance;
-        }
-
-        return distance;
-    }
-
-    /*
-    public int heuristic(State s) { //manhattan distance
-        List<OrderedPair> crates = s.getCrates();
-        int distance = 0 ;
-        for(OrderedPair c: crates){
-            int min = 1000;
-            for(OrderedPair g: goals){
-                int md = Math.abs(c.getX()-g.getX()) + Math.abs(c.getY()-g.getY());
-                if(md<min){
-                    min = md; //change the new minimum
-                }
-
-            }
-            distance += min; //only return minimum distance
-        }
-
-        return distance;
-    }
-*/
-    //OPEN HEURISTICS
-/*
-    public int heuristic(State s){
-        ArrayList<OrderedPair> crates = s.getCrates();
-
-        ArrayList<OrderedPair> completes = new ArrayList<>();
-
-        for (int i= 0 ;i < crates.size(); i++)
-            for (int j=0; j < goals.size();j++)
-                if (crates.get(i).getX() == goals.get(j).getX() && crates.get(i).getY() == goals.get(j).getY())
-                    completes.add(crates.get(i));
-
-        return crates.size()-completes.size();
-    }
-
- */
-
-    //GBFS
+    //BFS
     public String SokobanSolver(){
-        State startState = new State(player,crates);
+        /*
+        //Convert it to local
+        OrderedPair player= new OrderedPair(this.player.getX(),this.player.getY());
 
-        // Use a priority queue for the frontier
-        PriorityQueue<SearchNode> frontier = new PriorityQueue<>(Comparator.comparingInt(SearchNode::getHeuristic));
-        frontier.add(new SearchNode(startState, Arrays.asList(new Action(0,0,' ')), 0));
+        ArrayList<OrderedPair> crates = new ArrayList<>();
+
+        for(OrderedPair i: this.crates){
+            crates.add(new OrderedPair(i.getX(),i.getY()));
+        }
+        */
+
+        State startState = new State(player,crates);
+        Queue<List<State>> frontier = new LinkedList<>();
+        frontier.add(Arrays.asList(startState));
+
+        Queue<List<Action>> actions = new LinkedList<>();
+        actions.add(Arrays.asList(new Action(0,0,' '))); //start with no moves
 
         HashSet<String> exploredSet = new HashSet<>();
-
         while(!frontier.isEmpty()){
-            SearchNode currentNode = frontier.poll();
-            State currentState = currentNode.state;
-            List<Action> nodeAction = currentNode.actions;
 
+            List<State> node = frontier.poll(); //head , left pop, assigns and deletes
+            List<Action> nodeAction = actions.poll(); //head , left pop,
+
+            State currentState = node.get(node.size()-1);
             String currentStateString = StatetoString(currentState);
 
-            if(checkEndState(currentState.getCrates())){
+            if(checkEndState(currentState.getCrates())){ //check if crates align with goals
+                //convert nodes to string
                 StringBuilder s = new StringBuilder();
-                for(Action a: nodeAction){
-                    s.append(a.getLetter());
+                if(nodeAction != null){
+                    for(Action a: nodeAction){
+                        s.append(a.getLetter());
+                    }
+                    return s.toString(); //return solution
                 }
-                return s.toString();
+                return ""; //return none, problem solved
             }
+            //check if the current node is explored or not
+            //!containset(currentState,exploredSet)
+
 
             if(!exploredSet.contains(currentStateString)){
                 exploredSet.add(currentStateString);
 
                 for(Action action: legalAction(currentState.getPlayer(),currentState.getCrates())){
                     State newState = updateState(action,currentState.getPlayer(),currentState.getCrates());
+                    //find deadlocks
 
-                    if(isFailed(newState.getCrates())){
-                        //System.out.println(currentStateString);
+                    if(isFailed(newState.getCrates())){ //if crates meet a deadlock
                         continue;
                     }
-                    List<Action> newAction = new ArrayList<>(nodeAction);
+                    List<State> newNode = new ArrayList<>(node); //parent to state node
+                    newNode.add(newState);
+                    List<Action> newAction = new ArrayList<>(nodeAction);//parent to actions node
                     newAction.add(action);
 
-                    int newHeuristic;
-                    //only change heuristic if it is true
-                    if(action.getPush()){
-                        newHeuristic = heuristic(newState);
-                    }else{
-                        newHeuristic = currentNode.getHeuristic();
-                    }
-
-                    frontier.add(new SearchNode(newState, newAction, newHeuristic));
+                    frontier.add(newNode);
+                    actions.add(newAction);
                 }
             }
         }
         return "";
     }
-
-
-
-    private class SearchNode {
-        State state;
-        List<Action> actions;
-        int heuristic;
-
-        SearchNode(State state, List<Action> actions, int heuristic) {
-            this.state = state;
-            this.actions = actions;
-            this.heuristic = heuristic;
-        }
-
-        int getHeuristic() {
-            return heuristic;
-        }
-    }
-
     public String solveSokobanPuzzle(int width, int height, char[][] mapData, char[][] itemsData) {
 
     /*  1. check possible moves. ( u,d,l,r )
